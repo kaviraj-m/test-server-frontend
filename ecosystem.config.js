@@ -13,10 +13,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
+        HOSTNAME: '0.0.0.0',
       },
       env_development: {
         NODE_ENV: 'development',
         PORT: 3001,
+        HOSTNAME: '0.0.0.0',
       },
       error_file: path.join(__dirname, 'logs/err.log'),
       out_file: path.join(__dirname, 'logs/out.log'),

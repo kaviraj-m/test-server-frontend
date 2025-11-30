@@ -202,6 +202,15 @@ pm2 save
 pm2 startup  # Follow the instructions
 ```
 
+## Troubleshooting
+
+If you encounter `errno: 13` (Permission Denied) errors, see `UBUNTU-TROUBLESHOOTING.md` for solutions.
+
+Common fixes:
+- Check if port 3001 is available: `sudo netstat -tulpn | grep 3001`
+- Allow port through firewall: `sudo ufw allow 3001/tcp`
+- Try a different port if 3001 is in use
+
 ## Access the Application
 
 After starting, the frontend will be available at:
