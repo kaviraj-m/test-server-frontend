@@ -6,6 +6,13 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop performance-frontend",
+    "pm2:restart": "pm2 restart performance-frontend",
+    "pm2:delete": "pm2 delete performance-frontend",
+    "pm2:logs": "pm2 logs performance-frontend",
+    "pm2:monit": "pm2 monit",
+    "pm2:status": "pm2 status",
     "lint": "eslint"
   },
   "dependencies": {
@@ -20,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.6",
+    "pm2": "^6.0.14",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
