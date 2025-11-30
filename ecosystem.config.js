@@ -1,9 +1,11 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'performance-frontend',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start',
+      script: path.join(__dirname, 'start-server.js'),
+      cwd: __dirname,
       instances: 1,
       exec_mode: 'fork',
       watch: false,
@@ -16,8 +18,8 @@ module.exports = {
         NODE_ENV: 'development',
         PORT: 3001,
       },
-      error_file: './logs/err.log',
-      out_file: './logs/out.log',
+      error_file: path.join(__dirname, 'logs/err.log'),
+      out_file: path.join(__dirname, 'logs/out.log'),
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       autorestart: true,
