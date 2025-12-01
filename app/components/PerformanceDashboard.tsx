@@ -37,18 +37,38 @@ interface TestResult {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-export default function PerformanceDashboard() {
+interface PerformanceDashboardProps {
+  showPasswordModal?: boolean;
+  setShowPasswordModal?: (show: boolean) => void;
+}
+
+export default function PerformanceDashboard({ 
+  showPasswordModal: externalShowPasswordModal, 
+  setShowPasswordModal: externalSetShowPasswordModal 
+}: PerformanceDashboardProps = {}) {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [concurrentRequests, setConcurrentRequests] = useState(10);
-  const [iterations, setIterations] = useState(1000000);
+  const [iterations, setIterations] = useState(100);
   const [requestsPerSecond, setRequestsPerSecond] = useState(0);
+  const [internalShowPasswordModal, setInternalShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  
+  // Use external modal state if provided, otherwise use internal state
+  const showPasswordModal = externalShowPasswordModal !== undefined ? externalShowPasswordModal : internalShowPasswordModal;
+  const setShowPasswordModal = externalSetShowPasswordModal || setInternalShowPasswordModal;
+  const [maxRequestLimit, setMaxRequestLimit] = useState(1000);
+  const [maxIterationLimit, setMaxIterationLimit] = useState(1000);
+  const [isUnlocked, setIsUnlocked] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const requestCountRef = useRef(0);
   const rpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
+  
+  // Password to unlock limits (you can change this)
+  const UNLOCK_PASSWORD = 'unlock2024';
 
   useEffect(() => {
     fetchSystemInfo();
@@ -66,7 +86,34 @@ export default function PerformanceDashboard() {
     }
   };
 
+  const validateLimits = (reqCount: number, iterCount: number): boolean => {
+    if (reqCount > maxRequestLimit && !isUnlocked) {
+      setShowPasswordModal(true);
+      return false;
+    }
+    if (iterCount > maxIterationLimit && !isUnlocked) {
+      setShowPasswordModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleUnlock = () => {
+    if (passwordInput === UNLOCK_PASSWORD) {
+      setIsUnlocked(true);
+      setShowPasswordModal(false);
+      setPasswordInput('');
+    } else {
+      alert('Incorrect password!');
+      setPasswordInput('');
+    }
+  };
+
   const runSingleTest = async () => {
+    if (!validateLimits(1, iterations)) {
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/compute`, {
@@ -84,6 +131,10 @@ export default function PerformanceDashboard() {
   };
 
   const runConcurrentTests = async () => {
+    if (!validateLimits(concurrentRequests, iterations)) {
+      return;
+    }
+    
     setIsRunning(true);
     setTestResults([]);
     
@@ -108,6 +159,12 @@ export default function PerformanceDashboard() {
   const startContinuousTesting = () => {
     if (intervalRef.current) return;
     
+    // Use the iteration limit or unlocked iterations
+    const testIterations = isUnlocked ? iterations : Math.min(iterations, maxIterationLimit);
+    if (!validateLimits(1, testIterations)) {
+      return;
+    }
+    
     setIsRunning(true);
     requestCountRef.current = 0;
     startTimeRef.current = Date.now();
@@ -119,7 +176,7 @@ export default function PerformanceDashboard() {
         const response = await fetch(`${API_URL}/compute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ iterations: 500000, complexity: 1 }),
+          body: JSON.stringify({ iterations: testIterations, complexity: 1 }),
         });
         const result = await response.json();
         requestCountRef.current += 1;
@@ -279,30 +336,76 @@ export default function PerformanceDashboard() {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Concurrent Requests
+              <span className="text-xs text-gray-500 ml-2">
+                (Max: {isUnlocked ? 'Unlimited' : maxRequestLimit})
+              </span>
             </label>
             <input
               type="number"
               value={concurrentRequests}
-              onChange={(e) => setConcurrentRequests(parseInt(e.target.value) || 10)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 10;
+                if (isUnlocked || val <= maxRequestLimit) {
+                  setConcurrentRequests(val);
+                } else {
+                  setShowPasswordModal(true);
+                }
+              }}
+              className={`w-full px-3 py-2 bg-gray-700 border rounded text-white ${
+                concurrentRequests > maxRequestLimit && !isUnlocked
+                  ? 'border-red-500'
+                  : 'border-gray-600'
+              }`}
               min="1"
-              max="100"
+              max={isUnlocked ? undefined : maxRequestLimit}
             />
+            {concurrentRequests > maxRequestLimit && !isUnlocked && (
+              <p className="text-xs text-red-400 mt-1">
+                ⚠ Limit exceeded. Enter password to unlock.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Iterations per Request
+              <span className="text-xs text-gray-500 ml-2">
+                (Max: {isUnlocked ? 'Unlimited' : maxIterationLimit.toLocaleString()})
+              </span>
             </label>
             <input
               type="number"
               value={iterations}
-              onChange={(e) => setIterations(parseInt(e.target.value) || 1000000)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 1000000;
+                if (isUnlocked || val <= maxIterationLimit) {
+                  setIterations(val);
+                } else {
+                  setShowPasswordModal(true);
+                }
+              }}
+              className={`w-full px-3 py-2 bg-gray-700 border rounded text-white ${
+                iterations > maxIterationLimit && !isUnlocked
+                  ? 'border-red-500'
+                  : 'border-gray-600'
+              }`}
               min="1000"
               step="100000"
+              max={isUnlocked ? undefined : maxIterationLimit}
             />
+            {iterations > maxIterationLimit && !isUnlocked && (
+              <p className="text-xs text-red-400 mt-1">
+                ⚠ Limit exceeded. Enter password to unlock.
+              </p>
+            )}
           </div>
         </div>
+        {isUnlocked && (
+          <div className="mb-4 p-3 bg-yellow-600/20 border border-yellow-600 rounded">
+            <p className="text-sm text-yellow-400">
+              🔓 Limits unlocked - High request mode enabled
+            </p>
+          </div>
+        )}
         <div className="flex gap-4">
           <button
             onClick={runSingleTest}
@@ -378,7 +481,60 @@ export default function PerformanceDashboard() {
           </div>
         </div>
       )}
+
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-semibold text-white mb-4">
+              Limit Exceeded - Password Required
+            </h3>
+            <p className="text-gray-300 mb-4">
+              Due to high request limits, please enter the password to increase limits:
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleUnlock();
+                  }
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                placeholder="Enter password"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={handleUnlock}
+                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium"
+              >
+                Unlock Limits
+              </button>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordInput('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-4">
+              Current limits: {maxRequestLimit} requests, {maxIterationLimit.toLocaleString()} iterations
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
